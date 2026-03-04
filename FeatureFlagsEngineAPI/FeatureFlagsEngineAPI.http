@@ -1,0 +1,6 @@
+@FeatureFlagsEngineAPI_HostAddress = http://localhost:5183
+
+GET {{FeatureFlagsEngineAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
