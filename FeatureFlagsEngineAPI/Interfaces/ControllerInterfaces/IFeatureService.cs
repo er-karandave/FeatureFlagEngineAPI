@@ -9,5 +9,8 @@ namespace FeatureFlagsEngineAPI.Interfaces.ControllerInterfaces
         List<Feature> GetAllInActiveFeatures();
         List<Feature> GetAllFeatures();
         List<Feature> GetFeatureByFeatureId(int IdFeature);
+        StatusResponse UpdateFeatureStatus(int FeatureId, bool IsActive);
+        object IsFeatureActive(int featureId);
+        object DeleteFeatureById(int featureId);
     }
 }
