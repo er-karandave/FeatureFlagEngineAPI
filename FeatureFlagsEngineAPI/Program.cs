@@ -1,4 +1,5 @@
 using FeatureFlagsEngineAPI.Interfaces.ControllerInterfaces;
+using FeatureFlagsEngineAPI.Interfaces.DataLayerInterfaces;
 using FeatureFlagsEngineAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
@@ -22,12 +23,12 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Register Service
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IFeatureService, FeatureService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<INavigationService, NavigationService>();
 
-// JWT Authentication
-var jwtKey = builder.Configuration["Jwt:Key"];
+
 
 builder.Services.AddAuthentication(options =>
 {
@@ -45,7 +46,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(jwtKey!))
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? ""))
     };
 });
 

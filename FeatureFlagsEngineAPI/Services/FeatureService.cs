@@ -49,36 +49,73 @@ namespace FeatureFlagsEngineAPI.Services
             return features;
         }
 
-        public List<Feature> GetAllFeatures()
+        public List<Feature> GetAllFeatures(bool includeInactive = false)
         {
             List<Feature> features = new List<Feature>();
 
-            using SqlConnection connection = new SqlConnection(_connectionString);
-            connection.Open();
-
-            string query = @"SELECT IdFeature, FeatureName, FeatureDetails,FeatureDisplayName,Link,IsActive
-                     FROM tblFeatures";
-
-            using SqlCommand command = new SqlCommand(query, connection);
-
-            using SqlDataReader reader = command.ExecuteReader();
-
-            while (reader.Read())
+            try
             {
-                Feature feature = new Feature
+                using SqlConnection connection = new SqlConnection(_connectionString);
+                connection.Open();
+
+                string query = @"
+            SELECT 
+                IdFeature,
+                FeatureName,
+                FeatureDetails,
+                FeatureDisplayName,
+                Link,
+                IsActive,
+                CreatedOn,
+                CreatedBy,
+                UpdatedOn,
+                UpdatedBy,
+                ActiveStatusChangedBy,
+                ActiveStatusChangedOn
+            FROM tblFeatures";
+
+                if (!includeInactive)
                 {
-                    IdFeature = reader.GetInt32(0),
-                    FeatureName = reader.GetString(1),
-                    FeatureDetails = reader.GetString(2),
-                    FeatureDisplayName = reader.GetString(3),
-                    Link = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                    IsActive = reader.GetBoolean(5)
-                };
+                    query += " WHERE IsActive = 1";
+                }
 
-                features.Add(feature);
+                query += " ORDER BY FeatureName";
+
+                using SqlCommand command = new SqlCommand(query, connection);
+
+                using SqlDataReader reader = command.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    Feature feature = new Feature
+                    {
+                        IdFeature = reader.GetInt32(0),
+                        FeatureName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                        FeatureDetails = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                        FeatureDisplayName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                        Link = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                        IsActive = reader.GetBoolean(5),
+                        CreatedOn = reader.IsDBNull(6) ? DateTime.MinValue : reader.GetDateTime(6),
+                        CreatedBy = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                        UpdatedOn = reader.IsDBNull(8) ? (DateTime?)null : reader.GetDateTime(8),
+                        UpdatedBy = reader.IsDBNull(9) ? (int?)null : reader.GetInt32(9),
+                        ActiveStatusChangedBy = reader.IsDBNull(10) ? (int?)null : reader.GetInt32(10),
+                        ActiveStatusChangedOn = reader.IsDBNull(11) ? (DateTime?)null : reader.GetDateTime(11)
+                    };
+
+                    features.Add(feature);
+                }
+
+                return features;
             }
-
-            return features;
+            catch (SqlException sqlEx)
+            {
+                throw; 
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
         }
 
         public List<Feature> GetAllInActiveFeatures()
@@ -144,60 +181,43 @@ namespace FeatureFlagsEngineAPI.Services
                 features.Add(feature);
             }
 
-            return features; // returns empty list if no data
+            return features; 
         }
 
-        public List<Feature> GetFeatureByFeatureId(int IdFeature)
+        public Feature GetFeatureByFeatureId(int featureId)
         {
-            List<Feature> features = new List<Feature>();
-
             using SqlConnection connection = new SqlConnection(_connectionString);
             connection.Open();
 
-            string query = @"SELECT IdFeature, FeatureName, FeatureDetails,FeatureDisplayName,Link
-                     FROM tblFeatures
-                     WHERE IdFeature = @IdFeature
-                     AND IsActive = 1";
+            string query = @"
+            SELECT 
+                IdFeature, FeatureName, FeatureDetails, FeatureDisplayName,
+                Link, IsActive, CreatedOn, CreatedBy
+            FROM tblFeatures
+            WHERE IdFeature = @FeatureId";
 
             using SqlCommand command = new SqlCommand(query, connection);
-            command.Parameters.AddWithValue("@IdFeature", IdFeature);
+            command.Parameters.AddWithValue("@FeatureId", featureId);
 
             using SqlDataReader reader = command.ExecuteReader();
 
-            while (reader.Read())
+            if (reader.Read())
             {
-                Feature feature = new Feature
+                return new Feature
                 {
                     IdFeature = reader.GetInt32(0),
-                    FeatureName = reader.GetString(1),
-                    FeatureDetails = reader.GetString(2),
-                    FeatureDisplayName = reader.GetString(3),
-                    Link = reader.IsDBNull(4) ? string.Empty : reader.GetString(4)
+                    FeatureName = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                    FeatureDetails = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                    FeatureDisplayName = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    Link = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                    IsActive = reader.GetBoolean(5),
+                    CreatedOn = reader.IsDBNull(6) ? DateTime.MinValue : reader.GetDateTime(6),
+                    CreatedBy = reader.IsDBNull(7) ? 0 : reader.GetInt32(7)
                 };
-
-                features.Add(feature);
             }
 
-            return features; // returns empty list if no data
+            return null;
         }
-
-        //public bool UpdateFeatureStatus(int FeatureId, int IsActive)
-        //{
-        //    using SqlConnection connection = new SqlConnection(_connectionString);
-        //    connection.Open();
-
-        //    string query = @"UPDATE tblFeatures 
-        //             SET IsActive = @IsActive,
-        //                 ActiveStatusChangedOn = GETDATE()
-        //             WHERE IdFeature = @IdFeature";
-
-        //    using SqlCommand command = new SqlCommand(query, connection);
-        //    command.Parameters.AddWithValue("@IsActive", IsActive);
-        //    command.Parameters.AddWithValue("@IdFeature", FeatureId);
-
-        //    int rowsAffected = command.ExecuteNonQuery();
-        //    return rowsAffected > 0; // true if update succeeded
-        //}
 
         public StatusResponse UpdateFeatureStatus(int FeatureId, bool IsActive)
         {
@@ -206,7 +226,6 @@ namespace FeatureFlagsEngineAPI.Services
                 using SqlConnection connection = new SqlConnection(_connectionString);
                 connection.Open();
 
-                // ✅ Simple UPDATE query - only IsActive field
                 string query = @"UPDATE tblFeatures 
                      SET IsActive = @IsActive,
                          ActiveStatusChangedOn = GETDATE()
@@ -246,38 +265,38 @@ namespace FeatureFlagsEngineAPI.Services
             }
         }
 
-        public object IsFeatureActive(int featureId)  // Keep return type as object for compatibility
+        public object IsFeatureActive(int featureId)
         {
             try
             {
-                using var connection = new SqlConnection(_connectionString);
+                using SqlConnection connection = new SqlConnection(_connectionString);
                 connection.Open();
 
-                string query = @"SELECT IsActive, FeatureDisplayName 
-                            FROM tblFeatures 
-                            WHERE [IdFeature] = @FeatureId";
+                string query = @"
+                SELECT IsActive, FeatureDisplayName
+                FROM tblFeatures
+                WHERE IdFeature = @FeatureId";
 
-                using var command = new SqlCommand(query, connection);
+                using SqlCommand command = new SqlCommand(query, connection);
                 command.Parameters.AddWithValue("@FeatureId", featureId);
 
-                using var reader = command.ExecuteReader();
+                using SqlDataReader reader = command.ExecuteReader();
 
                 if (reader.Read())
                 {
                     bool isActive = reader.GetBoolean(0);
-                    string featureName = reader.GetString(1);
+                    string featureName = reader.IsDBNull(1) ? "Unknown" : reader.GetString(1);
 
-                    // ✅ Return strongly-typed object (but as 'object')
-                    return new SimpleFeatureResponse
+                    return new
                     {
                         IsActive = isActive,
                         Message = isActive
-                            ? $""
+                            ? ""
                             : $"Feature '{featureName}' is currently inactive."
                     };
                 }
 
-                return new SimpleFeatureResponse
+                return new
                 {
                     IsActive = false,
                     Message = "Feature not found."
@@ -285,7 +304,7 @@ namespace FeatureFlagsEngineAPI.Services
             }
             catch (Exception ex)
             {
-                return new SimpleFeatureResponse
+                return new
                 {
                     IsActive = false,
                     Message = "Error checking feature status."
@@ -297,12 +316,13 @@ namespace FeatureFlagsEngineAPI.Services
         {
             try
             {
-                using var connection = new SqlConnection(_connectionString);
+                using SqlConnection connection = new SqlConnection(_connectionString);
                 connection.Open();
 
-                string selectQuery = @"SELECT IsActive, FeatureDisplayName 
-                              FROM tblFeatures 
-                              WHERE [IdFeature] = @FeatureId";
+                string selectQuery = @"
+                SELECT IsActive, FeatureDisplayName
+                FROM tblFeatures
+                WHERE IdFeature = @FeatureId";
 
                 using var selectCommand = new SqlCommand(selectQuery, connection);
                 selectCommand.Parameters.AddWithValue("@FeatureId", featureId);
@@ -311,18 +331,13 @@ namespace FeatureFlagsEngineAPI.Services
 
                 if (!reader.Read())
                 {
-                    return new SimpleFeatureResponse
-                    {
-                        IsActive = false,
-                        Message = "Feature not found."
-                    };
+                    return new { IsActive = false, Message = "Feature not found." };
                 }
 
-                bool isActive = reader.GetBoolean(0);
-                string featureName = reader.GetString(1);
-                reader.Close(); 
+                string featureName = reader.IsDBNull(1) ? "Unknown" : reader.GetString(1);
+                reader.Close();
 
-                string deleteQuery = @"DELETE FROM tblFeatures WHERE [IdFeature] = @FeatureId";
+                string deleteQuery = @"DELETE FROM tblFeatures WHERE IdFeature = @FeatureId";
 
                 using var deleteCommand = new SqlCommand(deleteQuery, connection);
                 deleteCommand.Parameters.AddWithValue("@FeatureId", featureId);
@@ -331,7 +346,7 @@ namespace FeatureFlagsEngineAPI.Services
 
                 if (rowsAffected > 0)
                 {
-                    return new SimpleFeatureResponse
+                    return new
                     {
                         IsActive = true,
                         Message = $"Feature '{featureName}' deleted successfully."
@@ -339,7 +354,7 @@ namespace FeatureFlagsEngineAPI.Services
                 }
                 else
                 {
-                    return new SimpleFeatureResponse
+                    return new
                     {
                         IsActive = false,
                         Message = "Failed to delete feature. Please try again."
@@ -348,7 +363,7 @@ namespace FeatureFlagsEngineAPI.Services
             }
             catch (SqlException sqlEx) when (sqlEx.Number == 547)
             {
-                return new SimpleFeatureResponse
+                return new
                 {
                     IsActive = false,
                     Message = "Cannot delete: Feature is referenced by other data."
@@ -356,7 +371,7 @@ namespace FeatureFlagsEngineAPI.Services
             }
             catch (Exception ex)
             {
-                return new SimpleFeatureResponse
+                return new
                 {
                     IsActive = false,
                     Message = "Error deleting feature. Please try again."

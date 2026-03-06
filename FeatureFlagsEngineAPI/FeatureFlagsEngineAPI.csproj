@@ -16,7 +16,6 @@
     <Folder Include="BusinessLayer\" />
     <Folder Include="DataAccessLayer\" />
     <Folder Include="Interfaces\BusinessLayerInterfaces\" />
-    <Folder Include="Interfaces\DataLayerInterfaces\" />
     <Folder Include="Middleware\" />
   </ItemGroup>
 
